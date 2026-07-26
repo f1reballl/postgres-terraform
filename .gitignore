@@ -1,0 +1,15 @@
+# Terraform local state, provider cache, and local variable files
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+crash.log
+crash.*.log
+
+# Local secrets and generated credentials
+.env
+.env.*
+*.pem
+*.key
+*.crt
