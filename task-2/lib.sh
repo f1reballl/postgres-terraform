@@ -1,25 +1,31 @@
 #!/usr/bin/env bash
 
 task2_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-task2_inventory="${task2_script_dir}/deployments.tsv"
+DEPLOYMENT_COUNT="${DEPLOYMENT_COUNT:-15}"
+POSTGRES_BASE_PORT="${POSTGRES_BASE_PORT:-15432}"
 task2_generated_dir="${task2_script_dir}/.generated"
 task2_compose_file="${task2_generated_dir}/docker-compose.yml"
 task2_state_dir="${task2_script_dir}/.state"
 task2_terraform_dir="${task2_script_dir}/terraform"
 
 task2_each_deployment() {
-  local deployment port
+  local index deployment port
 
-  while IFS=$'\t' read -r deployment port; do
-    [[ -z "${deployment}" || "${deployment}" == \#* ]] && continue
+  if [[ ! "${DEPLOYMENT_COUNT}" =~ ^[1-9][0-9]*$ ]] || [[ ! "${POSTGRES_BASE_PORT}" =~ ^[0-9]+$ ]]; then
+    echo "DEPLOYMENT_COUNT must be a positive integer and POSTGRES_BASE_PORT must be numeric." >&2
+    return 1
+  fi
 
-    if [[ ! "${deployment}" =~ ^[a-z0-9-]+$ ]] || [[ ! "${port}" =~ ^[0-9]{4,5}$ ]]; then
-      echo "Invalid deployment inventory entry: ${deployment} ${port}" >&2
-      return 1
-    fi
+  if (( POSTGRES_BASE_PORT < 1 || POSTGRES_BASE_PORT + DEPLOYMENT_COUNT - 1 > 65535 )); then
+    echo "Derived PostgreSQL ports must be between 1 and 65535." >&2
+    return 1
+  fi
 
+  for ((index = 1; index <= DEPLOYMENT_COUNT; index++)); do
+    printf -v deployment 'deployment-%02d' "${index}"
+    port=$((POSTGRES_BASE_PORT + index - 1))
     printf '%s\t%s\n' "${deployment}" "${port}"
-  done < "${task2_inventory}"
+  done
 }
 
 task2_prepare_compose() {
@@ -30,7 +36,6 @@ task2_prepare_compose() {
   printf 'services:\n' > "${temporary_file}"
 
   while IFS=$'\t' read -r deployment port; do
-    [[ -z "${deployment}" || "${deployment}" == \#* ]] && continue
     printf '%s\n' \
       "  ${deployment}:" \
       "    container_name: task2-${deployment}" \
@@ -48,13 +53,12 @@ task2_prepare_compose() {
       "      interval: 2s" \
       "      timeout: 3s" \
       "      retries: 15" >> "${temporary_file}"
-  done < "${task2_inventory}"
+  done < <(task2_each_deployment)
 
   printf '\nvolumes:\n' >> "${temporary_file}"
   while IFS=$'\t' read -r deployment port; do
-    [[ -z "${deployment}" || "${deployment}" == \#* ]] && continue
     printf '  %s_data:\n' "${deployment}" >> "${temporary_file}"
-  done < "${task2_inventory}"
+  done < <(task2_each_deployment)
 
   mv "${temporary_file}" "${task2_compose_file}"
 }

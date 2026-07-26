@@ -5,12 +5,14 @@ machine. It does not modify or depend on the running Task 1 deployment.
 
 ## Architecture
 
-`deployments.tsv` is the complete deployment inventory. Each row supplies an
-independent deployment identifier and a distinct localhost port. `start.sh`
-renders a local Docker Compose configuration from that inventory, starts one
-PostgreSQL container per row, then runs the same generic Terraform root once
-per row. Terraform uses a single default PostgreSQL provider configuration;
-the runner supplies the target port and stores state at
+`lib.sh` derives deployments from `DEPLOYMENT_COUNT` (default `15`) and
+`POSTGRES_BASE_PORT` (default `15432`). It creates identifiers
+`deployment-01` through `deployment-15` and maps them to consecutive ports
+`15432` through `15446`. `start.sh` renders a local Docker Compose
+configuration from those settings, starts one PostgreSQL container per derived
+deployment, then runs the same generic Terraform root once per deployment.
+Terraform uses a single default PostgreSQL provider configuration; the runner
+supplies the target port and stores state at
 `.state/<deployment>.tfstate`.
 
 Each state file is the local equivalent of a separate cloud-account Terraform
@@ -46,15 +48,15 @@ access, and that all generated credentials are distinct across deployments.
 
 ## Add deployment 16
 
-Add one tab-separated row to `task-2/deployments.tsv` with a unique identifier
-and unused port, for example:
+Run:
 
-```text
-deployment-16	15447
+```bash
+DEPLOYMENT_COUNT=16 ./task-2/start.sh
 ```
 
-Then rerun `./task-2/start.sh`. No provider aliases, copied Terraform roots,
-or per-deployment application definitions are required.
+This derives `deployment-16` on port `15447` without provider aliases, copied
+Terraform roots, or per-deployment application definitions. Set
+`POSTGRES_BASE_PORT` too when the default port range conflicts locally.
 
 ## Teardown
 
@@ -64,6 +66,12 @@ volumes, and removes generated local state and Compose files:
 ```bash
 ./task-2/teardown.sh
 ```
+
+Terraform destroys managed databases, grants, default privileges, and state.
+The shared read-only role uses `skip_drop_role = true` because PostgreSQL can
+retain privilege dependencies that prevent its removal. The subsequent Compose
+volume deletion removes the complete local cluster, including that intentionally
+retained role. Use this full teardown rather than Terraform destroy alone.
 
 ## Security and local-simulation limitations
 

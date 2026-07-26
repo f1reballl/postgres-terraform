@@ -31,8 +31,11 @@ insert or create tables, and Docker publishes PostgreSQL only on localhost.
 
 ## Teardown
 
-Destroy the Terraform-managed roles and databases, then remove the local
-container and data volume:
+Terraform destroys managed databases, grants, default privileges, and state.
+The shared read-only role is intentionally retained during `terraform destroy`
+because PostgreSQL can retain privilege dependencies on it. Complete cleanup
+therefore requires removing the Docker Compose volume immediately afterward;
+that removes the whole local PostgreSQL cluster, including the retained role.
 
 ```bash
 terraform -chdir=task-1/terraform destroy

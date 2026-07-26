@@ -15,9 +15,10 @@ resource "random_password" "readonly" {
 }
 
 resource "postgresql_role" "readonly" {
-  name     = "readonly_user"
-  login    = true
-  password = random_password.readonly.result
+  name           = "readonly_user"
+  login          = true
+  password       = random_password.readonly.result
+  skip_drop_role = true
 }
 
 ##############################################################################

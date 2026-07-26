@@ -8,11 +8,6 @@ task2_prepare_compose
 expected_count="$(task2_each_deployment | wc -l | tr -d ' ')"
 running_count="$(docker compose -p task2 -f "${task2_compose_file}" ps --services --status running | wc -l | tr -d ' ')"
 
-if [[ "${expected_count}" != "15" ]]; then
-  echo "Expected exactly 15 deployments in the inventory; found ${expected_count}." >&2
-  exit 1
-fi
-
 if [[ "${running_count}" != "${expected_count}" ]]; then
   echo "Expected ${expected_count} healthy PostgreSQL services; found ${running_count} running." >&2
   exit 1
