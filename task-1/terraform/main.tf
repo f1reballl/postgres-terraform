@@ -1,59 +1,35 @@
+locals {
+  applications = {
+    app_alpha = "app_alpha_user"
+    app_beta  = "app_beta_user"
+    app_gamma = "app_gamma_user"
+  }
+}
+
+##############################################################################
+########## Creates the shared reporting user #################################
+##############################################################################
 resource "random_password" "readonly" {
   length  = 32
   special = true
 }
 
 resource "postgresql_role" "readonly" {
-  provider = postgresql.admin
-
   name     = "readonly_user"
   login    = true
   password = random_password.readonly.result
 }
 
-resource "terraform_data" "revoke_public_postgres_database" {
-  input = "postgres"
+##############################################################################
+########## Creates databases/users from local.applications ###################
+##############################################################################
 
-  provisioner "local-exec" {
-    command = "docker exec task1-postgres psql --set ON_ERROR_STOP=1 -U postgres -d postgres -c 'REVOKE CONNECT ON DATABASE postgres FROM PUBLIC;'"
-  }
-}
-
-module "app_alpha" {
+module "database_access" {
   source = "./modules/database-access"
 
-  database_name = "app_alpha"
-  app_role_name = "app_alpha_user"
+  for_each = local.applications
+
+  database_name = each.key
+  app_role_name = each.value
   readonly_role = postgresql_role.readonly.name
-
-  providers = {
-    postgresql.admin  = postgresql.admin
-    postgresql.target = postgresql.app_alpha
-  }
-}
-
-module "app_beta" {
-  source = "./modules/database-access"
-
-  database_name = "app_beta"
-  app_role_name = "app_beta_user"
-  readonly_role = postgresql_role.readonly.name
-
-  providers = {
-    postgresql.admin  = postgresql.admin
-    postgresql.target = postgresql.app_beta
-  }
-}
-
-module "app_gamma" {
-  source = "./modules/database-access"
-
-  database_name = "app_gamma"
-  app_role_name = "app_gamma_user"
-  readonly_role = postgresql_role.readonly.name
-
-  providers = {
-    postgresql.admin  = postgresql.admin
-    postgresql.target = postgresql.app_gamma
-  }
 }

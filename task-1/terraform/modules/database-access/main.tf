@@ -4,42 +4,26 @@ resource "random_password" "application" {
 }
 
 resource "postgresql_role" "application" {
-  provider = postgresql.admin
-
   name     = var.app_role_name
   login    = true
   password = random_password.application.result
 }
 
 resource "postgresql_database" "application" {
-  provider = postgresql.admin
-
   name  = var.database_name
-  owner = "postgres"
+  owner = postgresql_role.application.name
 }
 
 resource "terraform_data" "revoke_public_database" {
-  input = postgresql_database.application.name
+  input            = postgresql_database.application.name
+  triggers_replace = [postgresql_database.application.id]
 
   provisioner "local-exec" {
     command = "docker exec task1-postgres psql --set ON_ERROR_STOP=1 -U postgres -d postgres -c 'REVOKE CONNECT ON DATABASE ${postgresql_database.application.name} FROM PUBLIC;'"
   }
 }
 
-resource "postgresql_grant" "application_database" {
-  provider = postgresql.admin
-
-  database    = postgresql_database.application.name
-  role        = postgresql_role.application.name
-  object_type = "database"
-  privileges  = ["CONNECT", "TEMPORARY"]
-
-  depends_on = [terraform_data.revoke_public_database]
-}
-
 resource "postgresql_grant" "readonly_database" {
-  provider = postgresql.admin
-
   database    = postgresql_database.application.name
   role        = var.readonly_role
   object_type = "database"
@@ -49,18 +33,17 @@ resource "postgresql_grant" "readonly_database" {
 }
 
 resource "terraform_data" "revoke_public_schema" {
-  input = postgresql_database.application.name
+  input            = postgresql_database.application.name
+  triggers_replace = [postgresql_database.application.id]
 
   provisioner "local-exec" {
     command = "docker exec task1-postgres psql --set ON_ERROR_STOP=1 -U postgres -d ${postgresql_database.application.name} -c 'REVOKE ALL ON SCHEMA public FROM PUBLIC;'"
   }
 
-  depends_on = [postgresql_grant.application_database]
+  depends_on = [terraform_data.revoke_public_database]
 }
 
 resource "postgresql_grant" "application_schema" {
-  provider = postgresql.target
-
   database    = postgresql_database.application.name
   role        = postgresql_role.application.name
   schema      = "public"
@@ -71,8 +54,6 @@ resource "postgresql_grant" "application_schema" {
 }
 
 resource "postgresql_grant" "readonly_schema" {
-  provider = postgresql.target
-
   database    = postgresql_database.application.name
   role        = var.readonly_role
   schema      = "public"
@@ -82,22 +63,7 @@ resource "postgresql_grant" "readonly_schema" {
   depends_on = [postgresql_grant.application_schema]
 }
 
-resource "postgresql_default_privileges" "readonly_tables" {
-  provider = postgresql.target
-
-  database    = postgresql_database.application.name
-  owner       = "postgres"
-  role        = var.readonly_role
-  schema      = "public"
-  object_type = "table"
-  privileges  = ["SELECT"]
-
-  depends_on = [postgresql_grant.readonly_schema]
-}
-
 resource "postgresql_default_privileges" "readonly_application_tables" {
-  provider = postgresql.target
-
   database    = postgresql_database.application.name
   owner       = postgresql_role.application.name
   role        = var.readonly_role

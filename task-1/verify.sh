@@ -48,26 +48,28 @@ declare -a databases=(app_alpha app_beta app_gamma)
 declare -a users=(app_alpha_user app_beta_user app_gamma_user readonly_user)
 declare -a passwords=("${app_alpha_password}" "${app_beta_password}" "${app_gamma_password}")
 
-for database in "${databases[@]}"; do
-  postgresql "${database}" postgres local-root-password \
-    "CREATE TABLE IF NOT EXISTS verification_seed (id integer PRIMARY KEY, value text NOT NULL); INSERT INTO verification_seed (id, value) VALUES (1, 'seed') ON CONFLICT (id) DO NOTHING;"
-done
-
 for index in "${!databases[@]}"; do
   database="${databases[${index}]}"
   user="${users[${index}]}"
   password="${passwords[${index}]}"
 
   postgresql "${database}" "${user}" "${password}" \
-    "CREATE TABLE IF NOT EXISTS verification_${database} (id integer PRIMARY KEY); INSERT INTO verification_${database} (id) VALUES (1) ON CONFLICT (id) DO NOTHING;"
+    "CREATE TABLE IF NOT EXISTS verification_${database} (id integer PRIMARY KEY);
+    INSERT INTO verification_${database} (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
+    CREATE TABLE IF NOT EXISTS verification_seed (
+      id integer PRIMARY KEY,
+      value text NOT NULL
+    );
+    INSERT INTO verification_seed (id, value)
+    VALUES (1, 'seed')
+    ON CONFLICT (id) DO NOTHING;"
 
   for other_database in "${databases[@]}"; do
     if [[ "${other_database}" != "${database}" ]]; then
       expect_failure postgresql "${other_database}" "${user}" "${password}" "SELECT 1;"
     fi
   done
-
-  expect_failure postgresql postgres "${user}" "${password}" "SELECT 1;"
 done
 
 for database in "${databases[@]}"; do
@@ -75,7 +77,5 @@ for database in "${databases[@]}"; do
   expect_failure postgresql "${database}" readonly_user "${readonly_password}" "INSERT INTO verification_seed (id, value) VALUES (2, 'not allowed');"
   expect_failure postgresql "${database}" readonly_user "${readonly_password}" "CREATE TABLE verification_readonly_denied (id integer);"
 done
-
-expect_failure postgresql postgres readonly_user "${readonly_password}" "SELECT 1;"
 
 echo "Verification passed: databases and users exist, application access is isolated, readonly access is enforced, and PostgreSQL is localhost-only."

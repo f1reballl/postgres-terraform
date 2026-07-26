@@ -1,6 +1,7 @@
 # Terraform local state, provider cache, and local variable files
 **/.terraform/
 *.tfstate
+*.lock.hcl
 *.tfstate.*
 *.tfvars
 *.tfvars.json
