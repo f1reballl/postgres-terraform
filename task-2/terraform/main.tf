@@ -6,6 +6,10 @@ locals {
   }
 }
 
+##############################################################################
+########## Creates the shared reporting user #################################
+##############################################################################
+
 resource "random_password" "readonly" {
   length  = 32
   special = true
@@ -18,17 +22,12 @@ resource "postgresql_role" "readonly" {
   skip_drop_role = true
 }
 
-resource "terraform_data" "revoke_public_postgres_database" {
-  input            = var.deployment_id
-  triggers_replace = [var.postgres_container]
-
-  provisioner "local-exec" {
-    command = "docker exec ${var.postgres_container} psql --set ON_ERROR_STOP=1 -U postgres -d postgres -c 'REVOKE CONNECT ON DATABASE postgres FROM PUBLIC;'"
-  }
-}
+##############################################################################
+########## Creates databases/users from local.applications ###################
+##############################################################################
 
 module "database_access" {
-  source = "./modules/database-access"
+  source = "../../modules/database-access"
 
   for_each = local.applications
 

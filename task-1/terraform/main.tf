@@ -26,11 +26,12 @@ resource "postgresql_role" "readonly" {
 ##############################################################################
 
 module "database_access" {
-  source = "./modules/database-access"
+  source = "../../modules/database-access"
 
   for_each = local.applications
 
-  database_name = each.key
-  app_role_name = each.value
-  readonly_role = postgresql_role.readonly.name
+  database_name      = each.key
+  app_role_name      = each.value
+  readonly_role      = postgresql_role.readonly.name
+  postgres_container = var.postgres_container
 }

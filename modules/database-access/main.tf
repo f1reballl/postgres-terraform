@@ -1,3 +1,7 @@
+##############################################################################
+########## Creates the application database and its owner ####################
+##############################################################################
+
 resource "random_password" "application" {
   length  = 32
   special = true
@@ -14,12 +18,16 @@ resource "postgresql_database" "application" {
   owner = postgresql_role.application.name
 }
 
+##############################################################################
+########## Restricts default access and grants required permissions ##########
+##############################################################################
+
 resource "terraform_data" "revoke_public_database" {
   input            = postgresql_database.application.name
-  triggers_replace = [postgresql_database.application.id]
+  triggers_replace = [postgresql_database.application.id, var.postgres_container]
 
   provisioner "local-exec" {
-    command = "docker exec task1-postgres psql --set ON_ERROR_STOP=1 -U postgres -d postgres -c 'REVOKE CONNECT ON DATABASE ${postgresql_database.application.name} FROM PUBLIC;'"
+    command = "docker exec ${var.postgres_container} psql --set ON_ERROR_STOP=1 -U postgres -d postgres -c 'REVOKE CONNECT ON DATABASE ${postgresql_database.application.name} FROM PUBLIC;'"
   }
 }
 
@@ -34,10 +42,10 @@ resource "postgresql_grant" "readonly_database" {
 
 resource "terraform_data" "revoke_public_schema" {
   input            = postgresql_database.application.name
-  triggers_replace = [postgresql_database.application.id]
+  triggers_replace = [postgresql_database.application.id, var.postgres_container]
 
   provisioner "local-exec" {
-    command = "docker exec task1-postgres psql --set ON_ERROR_STOP=1 -U postgres -d ${postgresql_database.application.name} -c 'REVOKE ALL ON SCHEMA public FROM PUBLIC;'"
+    command = "docker exec ${var.postgres_container} psql --set ON_ERROR_STOP=1 -U postgres -d ${postgresql_database.application.name} -c 'REVOKE ALL ON SCHEMA public FROM PUBLIC;'"
   }
 
   depends_on = [terraform_data.revoke_public_database]
@@ -71,5 +79,5 @@ resource "postgresql_default_privileges" "readonly_application_tables" {
   object_type = "table"
   privileges  = ["SELECT"]
 
-  depends_on = [postgresql_grant.application_schema]
+  depends_on = [postgresql_grant.readonly_schema]
 }

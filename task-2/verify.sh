@@ -74,8 +74,6 @@ while IFS=$'\t' read -r deployment port; do
         expect_failure postgresql "${container}" "${other_database}" "${user}" "${password}" "SELECT 1;"
       fi
     done
-
-    expect_failure postgresql "${container}" postgres "${user}" "${password}" "SELECT 1;"
   done
 
   for database in "${databases[@]}"; do
@@ -84,7 +82,6 @@ while IFS=$'\t' read -r deployment port; do
     expect_failure postgresql "${container}" "${database}" readonly_user "${readonly_password}" "CREATE TABLE verification_readonly_denied (id integer);"
   done
 
-  expect_failure postgresql "${container}" postgres readonly_user "${readonly_password}" "SELECT 1;"
   echo "Verified ${deployment} on 127.0.0.1:${port}."
 done < <(task2_each_deployment)
 

@@ -4,3 +4,9 @@ variable "postgres_admin_password" {
   sensitive   = true
   default     = ""
 }
+
+variable "postgres_container" {
+  description = "Docker container name used for local PostgreSQL permission commands."
+  type        = string
+  default     = "task1-postgres"
+}
